@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learning World - Gamified Education Platform</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h2>Loading Learning World...</h2>
+            <p>Preparing your adventure!</p>
+            <button onclick="skipLoading()" style="margin-top: 20px; padding: 10px 20px; background: rgba(255,255,255,0.2); border: 2px solid white; color: white; border-radius: 25px; cursor: pointer; font-size: 14px;">
+                Skip Loading
+            </button>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar" style="display: none;">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <i class="fas fa-graduation-cap"></i>
+                <span>Learning World</span>
+            </div>
+            <div class="nav-menu">
+                <a href="#" class="nav-link" onclick="showHome()">
+                    <i class="fas fa-home"></i> Home
+                </a>
+                <a href="#" class="nav-link" onclick="showProfile()">
+                    <i class="fas fa-user"></i> Profile
+                </a>
+                <a href="#" class="nav-link" onclick="showLeaderboard()">
+                    <i class="fas fa-trophy"></i> Leaderboard
+                </a>
+                <a href="#" class="nav-link" onclick="showParentCorner()">
+                    <i class="fas fa-users"></i> Parent Corner
+                </a>
+                <a href="#" class="nav-link" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+            <div class="nav-user-info">
+                <span class="user-coins" id="user-coins">0 🪙</span>
+                <span class="user-level" id="user-level">Level 1</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Container -->
+    <main class="main-content" id="main-content" style="display: none;">
+        
+        <!-- Home Page -->
+        <div id="home-page" class="page">
+            <div class="hero-section">
+                <div class="hero-content">
+                    <h1>Welcome to Learning World!</h1>
+                    <p>Choose your adventure and start learning today!</p>
+                    <div class="user-welcome">
+                        <h2>Hello, <span id="user-name">Student</span>! 👋</h2>
+                        <p>Ready for today's challenges?</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="worlds-grid">
+                <div class="world-card" onclick="enterWorld('science')">
+                    <div class="world-icon">🔬</div>
+                    <h3>Science World</h3>
+                    <p>Explore the wonders of science!</p>
+                    <div class="world-level">Level <span id="science-level">1</span></div>
+                </div>
+                
+                <div class="world-card" onclick="enterWorld('math')">
+                    <div class="world-icon">🧮</div>
+                    <h3>Math World</h3>
+                    <p>Master numbers and calculations!</p>
+                    <div class="world-level">Level <span id="math-level">1</span></div>
+                </div>
+                
+                <div class="world-card" onclick="enterWorld('history')">
+                    <div class="world-icon">🏛️</div>
+                    <h3>Indian History World</h3>
+                    <p>Discover India's rich heritage!</p>
+                    <div class="world-level">Level <span id="history-level">1</span></div>
+                </div>
+                
+                <div class="world-card" onclick="enterWorld('lifeSkills')">
+                    <div class="world-icon">🌟</div>
+                    <h3>Life Skills World</h3>
+                    <p>Learn essential life skills!</p>
+                    <div class="world-level">Level <span id="life-skills-level">1</span></div>
+                </div>
+            </div>
+
+            <div class="today-challenges">
+                <h2>Today's Challenges</h2>
+                <div class="challenges-grid" id="challenges-grid">
+                    <!-- Challenges will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Page -->
+        <div id="login-page" class="page">
+            <div class="auth-container">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <i class="fas fa-graduation-cap"></i>
+                        <h1>Welcome Back!</h1>
+                        <p>Enter your email to receive a login code</p>
+                    </div>
+                    
+                    <form id="login-form" class="auth-form">
+                        <div class="form-group">
+                            <label for="login-email">Email Address</label>
+                            <input type="email" id="login-email" name="email" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> Send Login Code
+                        </button>
+                    </form>
+
+                    <form id="login-otp-form" class="auth-form" style="display: none;">
+                        <div class="form-group">
+                            <label for="login-otp">Enter 6-digit code</label>
+                            <input type="text" id="login-otp" name="otp" maxlength="6" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-sign-in-alt"></i> Login
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="showLoginForm()">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </button>
+                    </form>
+
+                    <div class="auth-footer">
+                        <p>New to Learning World? <a href="#" onclick="showRegister()">Create Account</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Register Page -->
+        <div id="register-page" class="page">
+            <div class="auth-container">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <i class="fas fa-user-plus"></i>
+                        <h1>Join Learning World!</h1>
+                        <p>Create your account to start learning</p>
+                    </div>
+                    
+                    <form id="register-form" class="auth-form">
+                        <div class="form-group">
+                            <label for="register-name">Student Name</label>
+                            <input type="text" id="register-name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-age">Age</label>
+                            <select id="register-age" name="age" required>
+                                <option value="">Select Age</option>
+                                <option value="6">6 years</option>
+                                <option value="7">7 years</option>
+                                <option value="8">8 years</option>
+                                <option value="9">9 years</option>
+                                <option value="10">10 years</option>
+                                <option value="11">11 years</option>
+                                <option value="12">12 years</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-email">Email Address</label>
+                            <input type="email" id="register-email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-interest">Area of Interest</label>
+                            <select id="register-interest" name="areaOfInterest" required>
+                                <option value="">Select Interest</option>
+                                <option value="Science">Science</option>
+                                <option value="Math">Math</option>
+                                <option value="History">History</option>
+                                <option value="Life Skills">Life Skills</option>
+                                <option value="All">All Subjects</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-parent-email">Parent's Email (Optional)</label>
+                            <input type="email" id="register-parent-email" name="parentEmail">
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> Send Verification Code
+                        </button>
+                    </form>
+
+                    <form id="register-otp-form" class="auth-form" style="display: none;">
+                        <div class="form-group">
+                            <label for="register-otp">Enter 6-digit verification code</label>
+                            <input type="text" id="register-otp" name="otp" maxlength="6" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-check"></i> Complete Registration
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="showRegisterForm()">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </button>
+                    </form>
+
+                    <div class="auth-footer">
+                        <p>Already have an account? <a href="#" onclick="showLogin()">Login</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- World Page -->
+        <div id="world-page" class="page">
+            <div class="world-header">
+                <button class="btn btn-secondary" onclick="showHome()">
+                    <i class="fas fa-arrow-left"></i> Back to Home
+                </button>
+                <h1 id="world-title">World</h1>
+                <div class="world-progress">
+                    <span>Level <span id="current-world-level">1</span></span>
+                </div>
+            </div>
+
+            <div class="lessons-container">
+                <div class="lessons-grid" id="lessons-grid">
+                    <!-- Lessons will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Lesson Page -->
+        <div id="lesson-page" class="page">
+            <div class="lesson-header">
+                <button class="btn btn-secondary" onclick="showWorld()">
+                    <i class="fas fa-arrow-left"></i> Back to World
+                </button>
+                <h1 id="lesson-title">Lesson</h1>
+                <div class="lesson-progress">
+                    <span id="lesson-progress-text">Question 1 of 5</span>
+                </div>
+            </div>
+
+            <div class="lesson-content">
+                <div class="lesson-description" id="lesson-description">
+                    <!-- Lesson description will be populated -->
+                </div>
+                
+                <div class="quiz-container" id="quiz-container">
+                    <!-- Quiz questions will be populated -->
+                </div>
+
+                <div class="lesson-actions">
+                    <button class="btn btn-primary" id="next-question-btn" onclick="nextQuestion()" style="display: none;">
+                        Next Question
+                    </button>
+                    <button class="btn btn-success" id="submit-lesson-btn" onclick="submitLesson()" style="display: none;">
+                        Complete Lesson
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaderboard Page -->
+        <div id="leaderboard-page" class="page">
+            <div class="page-header">
+                <h1><i class="fas fa-trophy"></i> Leaderboard</h1>
+                <p>See how you rank among other learners!</p>
+            </div>
+
+            <div class="leaderboard-container">
+                <div class="leaderboard-tabs">
+                    <button class="tab-btn active" onclick="showLeaderboardTab('global')">Global</button>
+                    <button class="tab-btn" onclick="showLeaderboardTab('science')">Science</button>
+                    <button class="tab-btn" onclick="showLeaderboardTab('math')">Math</button>
+                    <button class="tab-btn" onclick="showLeaderboardTab('history')">History</button>
+                    <button class="tab-btn" onclick="showLeaderboardTab('lifeSkills')">Life Skills</button>
+                </div>
+
+                <div class="leaderboard-content">
+                    <div class="my-rank" id="my-rank">
+                        <!-- User's rank will be populated -->
+                    </div>
+                    <div class="leaderboard-list" id="leaderboard-list">
+                        <!-- Leaderboard will be populated -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Page -->
+        <div id="profile-page" class="page">
+            <div class="page-header">
+                <h1><i class="fas fa-user"></i> My Profile</h1>
+            </div>
+
+            <div class="profile-container">
+                <div class="profile-card">
+                    <div class="profile-header">
+                        <div class="profile-avatar">
+                            <i class="fas fa-user-circle"></i>
+                        </div>
+                        <div class="profile-info">
+                            <h2 id="profile-name">Student Name</h2>
+                            <p id="profile-email">student@email.com</p>
+                            <div class="profile-stats">
+                                <div class="stat">
+                                    <span class="stat-value" id="profile-coins">0</span>
+                                    <span class="stat-label">Coins</span>
+                                </div>
+                                <div class="stat">
+                                    <span class="stat-value" id="profile-score">0</span>
+                                    <span class="stat-label">Total Score</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="profile-progress">
+                        <h3>Learning Progress</h3>
+                        <div class="progress-grid">
+                            <div class="progress-item">
+                                <div class="progress-icon">🔬</div>
+                                <div class="progress-info">
+                                    <h4>Science</h4>
+                                    <p>Level <span id="profile-science-level">1</span></p>
+                                </div>
+                            </div>
+                            <div class="progress-item">
+                                <div class="progress-icon">🧮</div>
+                                <div class="progress-info">
+                                    <h4>Math</h4>
+                                    <p>Level <span id="profile-math-level">1</span></p>
+                                </div>
+                            </div>
+                            <div class="progress-item">
+                                <div class="progress-icon">🏛️</div>
+                                <div class="progress-info">
+                                    <h4>History</h4>
+                                    <p>Level <span id="profile-history-level">1</span></p>
+                                </div>
+                            </div>
+                            <div class="progress-item">
+                                <div class="progress-icon">🌟</div>
+                                <div class="progress-info">
+                                    <h4>Life Skills</h4>
+                                    <p>Level <span id="profile-life-skills-level">1</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Parent Corner Page -->
+        <div id="parent-corner-page" class="page">
+            <div class="page-header">
+                <h1><i class="fas fa-users"></i> Parent Corner</h1>
+                <p>Monitor your child's learning progress</p>
+            </div>
+
+            <div class="parent-container">
+                <div class="parent-card">
+                    <h3>Learning Report</h3>
+                    <div class="report-stats">
+                        <div class="report-item">
+                            <span class="report-value" id="parent-total-time">0</span>
+                            <span class="report-label">Total Learning Time</span>
+                        </div>
+                        <div class="report-item">
+                            <span class="report-value" id="parent-lessons-completed">0</span>
+                            <span class="report-label">Lessons Completed</span>
+                        </div>
+                        <div class="report-item">
+                            <span class="report-value" id="parent-coins-earned">0</span>
+                            <span class="report-label">Coins Earned</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="parent-card">
+                    <h3>Screen Time Control</h3>
+                    <div class="screen-time-control">
+                        <label for="screen-time-limit">Daily Screen Time Limit (minutes)</label>
+                        <input type="number" id="screen-time-limit" min="10" max="120" value="20">
+                        <button class="btn btn-primary" onclick="updateScreenTime()">Update Limit</button>
+                    </div>
+                </div>
+
+                <div class="parent-card">
+                    <h3>Safety & Privacy</h3>
+                    <div class="safety-options">
+                        <div class="safety-item">
+                            <label>
+                                <input type="checkbox" id="safe-mode" checked>
+                                Safe Mode (Age-appropriate content only)
+                            </label>
+                        </div>
+                        <div class="safety-item">
+                            <label>
+                                <input type="checkbox" id="progress-notifications" checked>
+                                Progress Notifications
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Success/Error Messages -->
+    <div id="message-container" class="message-container"></div>
+
+    <!-- Scripts -->
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/learning.js"></script>
+    <script src="js/leaderboard.js"></script>
+    
+    <!-- Emergency Loading Screen Fix -->
+    <script>
+        // Emergency fix for loading screen
+        console.log('Emergency loading screen fix loaded');
+        
+        // Force hide loading screen after 2 seconds
+        setTimeout(() => {
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
+                console.log('Emergency: Hiding loading screen');
+                loadingScreen.style.display = 'none';
+                loadingScreen.classList.add('hidden');
+                
+                // Show login page
+                const loginPage = document.getElementById('login-page');
+                if (loginPage) {
+                    loginPage.classList.add('active');
+                }
+            }
+        }, 2000);
+        
+        // Also hide on any click
+        document.addEventListener('click', () => {
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
+                console.log('Emergency: Hiding loading screen on click');
+                loadingScreen.style.display = 'none';
+                loadingScreen.classList.add('hidden');
+                
+                // Show login page
+                const loginPage = document.getElementById('login-page');
+                if (loginPage) {
+                    loginPage.classList.add('active');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

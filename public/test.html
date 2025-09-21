@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .test-item {
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #45a049; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Learning World - Test Page</h1>
+        <p>This page helps diagnose any issues with the application.</p>
+        
+        <div class="test-item">
+            <h3>✅ Server Status</h3>
+            <p>If you can see this page, the server is working!</p>
+        </div>
+        
+        <div class="test-item">
+            <h3>🔗 Main Application</h3>
+            <p>Click the button below to go to the main application:</p>
+            <button onclick="window.location.href='/'">Go to Learning World</button>
+        </div>
+        
+        <div class="test-item">
+            <h3>📊 API Test</h3>
+            <p>Test if the API endpoints are working:</p>
+            <button onclick="testAPI()">Test API</button>
+            <div id="api-result"></div>
+        </div>
+        
+        <div class="test-item">
+            <h3>🔧 Debug Info</h3>
+            <p>Check browser console (F12) for detailed logs</p>
+            <button onclick="showDebugInfo()">Show Debug Info</button>
+            <div id="debug-info"></div>
+        </div>
+    </div>
+
+    <script>
+        function testAPI() {
+            const resultDiv = document.getElementById('api-result');
+            resultDiv.innerHTML = '<p>Testing API...</p>';
+            
+            // Test a public endpoint first
+            fetch('/api/learning/worlds')
+                .then(response => {
+                    if (response.status === 401) {
+                        resultDiv.innerHTML = '<p class="success">✅ API is working! (401 = Protected endpoint, this is correct)</p>';
+                    } else if (response.ok) {
+                        resultDiv.innerHTML = '<p class="success">✅ API is working!</p>';
+                    } else {
+                        resultDiv.innerHTML = '<p class="error">❌ API returned error: ' + response.status + '</p>';
+                    }
+                })
+                .catch(error => {
+                    resultDiv.innerHTML = '<p class="error">❌ API test failed: ' + error.message + '</p>';
+                });
+        }
+        
+        function showDebugInfo() {
+            const debugDiv = document.getElementById('debug-info');
+            const info = {
+                'User Agent': navigator.userAgent,
+                'Current URL': window.location.href,
+                'Local Storage': localStorage.length + ' items',
+                'Session Storage': sessionStorage.length + ' items',
+                'Cookies': document.cookie.length + ' characters'
+            };
+            
+            let html = '<ul>';
+            for (const [key, value] of Object.entries(info)) {
+                html += `<li><strong>${key}:</strong> ${value}</li>`;
+            }
+            html += '</ul>';
+            
+            debugDiv.innerHTML = html;
+        }
+        
+        // Auto-test on page load
+        window.addEventListener('load', () => {
+            console.log('Test page loaded successfully');
+            testAPI();
+        });
+    </script>
+</body>
+</html>
