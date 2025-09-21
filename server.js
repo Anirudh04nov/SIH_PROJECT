@@ -64,6 +64,9 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Access locally: http://localhost:${PORT}`);
+  console.log(`Access from network: http://10.12.133.242:${PORT}`);
+  console.log(`Access from network: http://192.168.137.1:${PORT}`);
 });
