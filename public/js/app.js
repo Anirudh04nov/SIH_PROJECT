@@ -1,19 +1,18 @@
-// Main application functionality
+// Main Application Manager
 class AppManager {
     constructor() {
         this.currentWorld = null;
         this.currentLesson = null;
         this.currentQuestionIndex = 0;
         this.userAnswers = [];
+        this.init();
     }
 
-    // Initialize app
     init() {
         this.setupEventListeners();
         this.loadInitialData();
     }
 
-    // Setup event listeners
     setupEventListeners() {
         // Navigation events
         document.addEventListener('click', (e) => {
@@ -24,7 +23,6 @@ class AppManager {
         });
     }
 
-    // Handle actions
     handleAction(action, element) {
         switch (action) {
             case 'enter-world':
@@ -38,341 +36,453 @@ class AppManager {
         }
     }
 
-    // Load initial data
     async loadInitialData() {
         if (authManager.currentUser) {
             await this.loadUserProgress();
+            await this.loadChallenges();
         }
     }
 
-    // Load user progress
     async loadUserProgress() {
         try {
-            const response = await fetch('/api/user/progress', {
-                headers: authManager.getAuthHeaders()
-            });
-
+            const response = await authManager.makeRequest('/api/user/progress', 'GET');
             if (response.ok) {
-                const data = await response.json();
-                this.updateProgressUI(data);
+                const progress = await response.json();
+                this.updateProgressUI(progress);
             }
         } catch (error) {
-            console.error('Error loading user progress:', error);
+            console.error('Failed to load user progress:', error);
         }
     }
 
-    // Update progress UI
-    updateProgressUI(progressData) {
+    updateProgressUI(progress) {
         // Update world levels
-        Object.keys(progressData.progress).forEach(world => {
-            const levelElement = document.getElementById(`${world}-level`);
-            if (levelElement) {
-                levelElement.textContent = progressData.progress[world].level;
-            }
+        const worldLevels = {
+            science: progress.scienceLevel || 1,
+            math: progress.mathLevel || 1,
+            history: progress.historyLevel || 1,
+            lifeSkills: progress.lifeSkillsLevel || 1
+        };
+
+        Object.keys(worldLevels).forEach(world => {
+            const levelElements = document.querySelectorAll(`#${world}-level, #profile-${world}-level`);
+            levelElements.forEach(el => el.textContent = worldLevels[world]);
         });
+
+        // Update coins
+        const coinsElements = document.querySelectorAll('#user-coins, #profile-coins');
+        coinsElements.forEach(el => el.textContent = `${progress.coins || 0} 🪙`);
+
+        // Update total score
+        const scoreElements = document.querySelectorAll('#profile-score');
+        scoreElements.forEach(el => el.textContent = progress.totalScore || 0);
     }
 
-    // Enter world
-    async enterWorld(world) {
-        this.currentWorld = world;
-        this.showWorldPage(world);
-        await this.loadWorldLessons(world);
+    async loadChallenges() {
+        try {
+            // For demo purposes, show some sample challenges
+            if (authManager.currentUser && authManager.currentUser._id === 'demo-user-123') {
+                const demoChallenges = [
+                    {
+                        icon: '🔬',
+                        title: 'Science Explorer',
+                        description: 'Complete 3 science lessons today',
+                        reward: 50
+                    },
+                    {
+                        icon: '🧮',
+                        title: 'Math Master',
+                        description: 'Solve 10 math problems correctly',
+                        reward: 75
+                    },
+                    {
+                        icon: '🏛️',
+                        title: 'History Buff',
+                        description: 'Learn about Indian history',
+                        reward: 40
+                    },
+                    {
+                        icon: '🌟',
+                        title: 'Life Skills Champion',
+                        description: 'Complete a life skills lesson',
+                        reward: 30
+                    }
+                ];
+                this.displayChallenges(demoChallenges);
+                return;
+            }
+
+            const response = await authManager.makeRequest('/api/learning/challenges', 'GET');
+            if (response.ok) {
+                const challenges = await response.json();
+                this.displayChallenges(challenges);
+            }
+        } catch (error) {
+            console.error('Failed to load challenges:', error);
+        }
     }
 
-    // Show world page
-    showWorldPage(world) {
+    displayChallenges(challenges) {
+        const container = document.getElementById('challenges-grid');
+        if (!container) return;
+
+        container.innerHTML = challenges.map(challenge => `
+            <div class="challenge-card">
+                <div class="challenge-icon">${challenge.icon}</div>
+                <h3>${challenge.title}</h3>
+                <p>${challenge.description}</p>
+                <div class="challenge-reward">+${challenge.reward} 🪙</div>
+            </div>
+        `).join('');
+    }
+
+    async enterWorld(worldName) {
+        this.currentWorld = worldName;
+        
+        // Show world page
         authManager.hideAllPages();
         document.getElementById('world-page').classList.add('active');
         
-        const worldNames = {
-            'science': 'Science World',
-            'math': 'Math World',
-            'history': 'Indian History World',
-            'lifeSkills': 'Life Skills World'
-        };
+        // Update world title
+        const worldTitle = document.getElementById('world-title');
+        if (worldTitle) {
+            worldTitle.textContent = this.getWorldDisplayName(worldName);
+        }
 
-        document.getElementById('world-title').textContent = worldNames[world];
-        
-        // Get current level for this world
-        const levelKey = world === 'lifeSkills' ? 'lifeSkills' : world;
-        const currentLevel = authManager.currentUser.level[levelKey];
-        document.getElementById('current-world-level').textContent = currentLevel;
+        // Load lessons for this world
+        await this.loadWorldLessons(worldName);
     }
 
-    // Load world lessons
-    async loadWorldLessons(world) {
-        try {
-            const level = authManager.currentUser.level[world === 'lifeSkills' ? 'lifeSkills' : world];
-            const response = await fetch(`/api/learning/lessons/${world}/${level}`, {
-                headers: authManager.getAuthHeaders()
-            });
+    getWorldDisplayName(worldName) {
+        const names = {
+            science: 'Science World',
+            math: 'Math World',
+            history: 'Indian History World',
+            lifeSkills: 'Life Skills World'
+        };
+        return names[worldName] || worldName;
+    }
 
+    async loadWorldLessons(worldName) {
+        try {
+            // For demo purposes, show sample lessons
+            if (authManager.currentUser && authManager.currentUser._id === 'demo-user-123') {
+                const demoLessons = this.getDemoLessons(worldName);
+                this.displayLessons(demoLessons);
+                return;
+            }
+
+            const response = await authManager.makeRequest(`/api/learning/lessons/${worldName}/1`, 'GET');
             if (response.ok) {
-                const data = await response.json();
-                this.displayLessons(data.lessons);
+                const lessons = await response.json();
+                this.displayLessons(lessons);
             } else {
-                authManager.showMessage('Failed to load lessons', 'error');
+                this.showMessage('Failed to load lessons', 'error');
             }
         } catch (error) {
-            console.error('Error loading lessons:', error);
-            authManager.showMessage('Network error loading lessons', 'error');
+            console.error('Failed to load lessons:', error);
+            this.showMessage('Network error. Please try again.', 'error');
         }
     }
 
-    // Display lessons
-    displayLessons(lessons) {
-        const lessonsGrid = document.getElementById('lessons-grid');
-        
-        if (lessons.length === 0) {
-            lessonsGrid.innerHTML = `
-                <div class="no-lessons">
-                    <h3>No lessons available for this level</h3>
-                    <p>Complete more lessons to unlock higher levels!</p>
-                </div>
-            `;
-            return;
-        }
+    getDemoLessons(worldName) {
+        const demoLessons = {
+            science: [
+                {
+                    _id: 'demo-science-1',
+                    title: 'The Solar System',
+                    description: 'Learn about planets and their characteristics',
+                    icon: '🪐',
+                    difficulty: 'Easy',
+                    reward: 25,
+                    progress: 0
+                },
+                {
+                    _id: 'demo-science-2',
+                    title: 'Photosynthesis',
+                    description: 'Discover how plants make their food',
+                    icon: '🌱',
+                    difficulty: 'Medium',
+                    reward: 35,
+                    progress: 50
+                },
+                {
+                    _id: 'demo-science-3',
+                    title: 'States of Matter',
+                    description: 'Explore solid, liquid, and gas',
+                    icon: '🧊',
+                    difficulty: 'Easy',
+                    reward: 30,
+                    progress: 100
+                }
+            ],
+            math: [
+                {
+                    _id: 'demo-math-1',
+                    title: 'Addition and Subtraction',
+                    description: 'Master basic arithmetic operations',
+                    icon: '➕',
+                    difficulty: 'Easy',
+                    reward: 20,
+                    progress: 0
+                },
+                {
+                    _id: 'demo-math-2',
+                    title: 'Multiplication Tables',
+                    description: 'Learn times tables from 1 to 10',
+                    icon: '✖️',
+                    difficulty: 'Medium',
+                    reward: 40,
+                    progress: 75
+                },
+                {
+                    _id: 'demo-math-3',
+                    title: 'Fractions',
+                    description: 'Understand parts of a whole',
+                    icon: '🍕',
+                    difficulty: 'Hard',
+                    reward: 50,
+                    progress: 25
+                }
+            ],
+            history: [
+                {
+                    _id: 'demo-history-1',
+                    title: 'Ancient India',
+                    description: 'Explore the Indus Valley Civilization',
+                    icon: '🏛️',
+                    difficulty: 'Easy',
+                    reward: 30,
+                    progress: 0
+                },
+                {
+                    _id: 'demo-history-2',
+                    title: 'Freedom Fighters',
+                    description: 'Learn about India\'s independence heroes',
+                    icon: '🦸',
+                    difficulty: 'Medium',
+                    reward: 45,
+                    progress: 60
+                }
+            ],
+            lifeSkills: [
+                {
+                    _id: 'demo-life-1',
+                    title: 'Personal Hygiene',
+                    description: 'Learn the importance of cleanliness',
+                    icon: '🧼',
+                    difficulty: 'Easy',
+                    reward: 25,
+                    progress: 0
+                },
+                {
+                    _id: 'demo-life-2',
+                    title: 'Time Management',
+                    description: 'Organize your daily activities',
+                    icon: '⏰',
+                    difficulty: 'Medium',
+                    reward: 35,
+                    progress: 40
+                }
+            ]
+        };
+        return demoLessons[worldName] || [];
+    }
 
-        lessonsGrid.innerHTML = lessons.map(lesson => `
-            <div class="lesson-card ${lesson.isCompleted ? 'completed' : ''}" 
-                 data-action="start-lesson" 
-                 data-lesson-id="${lesson._id}">
+    displayLessons(lessons) {
+        const container = document.getElementById('lessons-grid');
+        if (!container) return;
+
+        container.innerHTML = lessons.map(lesson => `
+            <div class="lesson-card" onclick="appManager.startLesson('${lesson._id}')">
+                <div class="lesson-icon">${lesson.icon || '📚'}</div>
                 <h3>${lesson.title}</h3>
                 <p>${lesson.description}</p>
                 <div class="lesson-meta">
-                    <span class="lesson-reward">${lesson.coinsReward} 🪙</span>
-                    <span class="lesson-time">${lesson.estimatedTime} min</span>
-                    ${lesson.isCompleted ? '<span class="lesson-status">Completed</span>' : '<span class="lesson-status pending">Start</span>'}
+                    <span class="lesson-difficulty">${lesson.difficulty || 'Easy'}</span>
+                    <span class="lesson-reward">+${lesson.reward || 10} 🪙</span>
+                </div>
+                <div class="lesson-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${lesson.progress || 0}%"></div>
+                    </div>
                 </div>
             </div>
         `).join('');
-
-        // Add click listeners
-        lessonsGrid.addEventListener('click', (e) => {
-            const lessonCard = e.target.closest('.lesson-card');
-            if (lessonCard) {
-                const lessonId = lessonCard.getAttribute('data-lesson-id');
-                this.startLesson(lessonId);
-            }
-        });
     }
 
-    // Start lesson
     async startLesson(lessonId) {
         try {
-            const response = await fetch(`/api/learning/lesson/${lessonId}`, {
-                headers: authManager.getAuthHeaders()
-            });
-
+            const response = await authManager.makeRequest(`/api/learning/lesson/${lessonId}`, 'GET');
             if (response.ok) {
-                const data = await response.json();
-                this.currentLesson = data.lesson;
+                const lesson = await response.json();
+                this.currentLesson = lesson;
                 this.currentQuestionIndex = 0;
                 this.userAnswers = [];
-                this.showLessonPage();
+                this.showLesson(lesson);
             } else {
-                authManager.showMessage('Failed to load lesson', 'error');
+                this.showMessage('Failed to load lesson', 'error');
             }
         } catch (error) {
-            console.error('Error loading lesson:', error);
-            authManager.showMessage('Network error loading lesson', 'error');
+            console.error('Failed to load lesson:', error);
+            this.showMessage('Network error. Please try again.', 'error');
         }
     }
 
-    // Show lesson page
-    showLessonPage() {
+    showLesson(lesson) {
+        // Show lesson page
         authManager.hideAllPages();
         document.getElementById('lesson-page').classList.add('active');
         
-        document.getElementById('lesson-title').textContent = this.currentLesson.title;
-        document.getElementById('lesson-description').innerHTML = `
-            <h3>About this lesson:</h3>
-            <p>${this.currentLesson.description}</p>
-            <div class="lesson-info">
-                <span class="info-item">🪙 ${this.currentLesson.coinsReward} coins reward</span>
-                <span class="info-item">⏱️ ${this.currentLesson.estimatedTime} minutes</span>
-                <span class="info-item">❓ ${this.currentLesson.questions.length} questions</span>
-            </div>
-        `;
+        // Update lesson title
+        const lessonTitle = document.getElementById('lesson-title');
+        if (lessonTitle) {
+            lessonTitle.textContent = lesson.title;
+        }
 
-        this.showQuestion(0);
+        // Display lesson content
+        this.displayLessonContent(lesson);
     }
 
-    // Show question
-    showQuestion(questionIndex) {
-        const question = this.currentLesson.questions[questionIndex];
+    displayLessonContent(lesson) {
+        const descriptionEl = document.getElementById('lesson-description');
         const quizContainer = document.getElementById('quiz-container');
         
-        document.getElementById('lesson-progress-text').textContent = 
-            `Question ${questionIndex + 1} of ${this.currentLesson.questions.length}`;
+        if (descriptionEl) {
+            descriptionEl.innerHTML = `
+                <h3>${lesson.title}</h3>
+                <p>${lesson.description}</p>
+                <div class="lesson-info">
+                    <span class="difficulty">Difficulty: ${lesson.difficulty || 'Easy'}</span>
+                    <span class="reward">Reward: +${lesson.reward || 10} 🪙</span>
+                </div>
+            `;
+        }
 
-        quizContainer.innerHTML = `
-            <div class="question-card">
-                <h3>${question.question}</h3>
-                <ul class="options-list">
-                    ${question.options.map((option, index) => `
-                        <li class="option-item">
-                            <button class="option-btn" data-answer="${index}">
-                                ${option}
+        if (quizContainer && lesson.questions && lesson.questions.length > 0) {
+            this.displayQuestion(lesson.questions[0], 0, lesson.questions.length);
+        }
+    }
+
+    displayQuestion(question, questionIndex, totalQuestions) {
+        const quizContainer = document.getElementById('quiz-container');
+        const progressText = document.getElementById('lesson-progress-text');
+        
+        if (progressText) {
+            progressText.textContent = `Question ${questionIndex + 1} of ${totalQuestions}`;
+        }
+
+        if (quizContainer) {
+            quizContainer.innerHTML = `
+                <div class="question-card">
+                    <h3>${question.question}</h3>
+                    <div class="options">
+                        ${question.options.map((option, index) => `
+                            <button class="option-btn" onclick="appManager.selectAnswer(${index}, '${option}')">
+                                ${String.fromCharCode(65 + index)}. ${option}
                             </button>
-                        </li>
-                    `).join('')}
-                </ul>
-            </div>
-        `;
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    }
 
-        // Add click listeners to options
-        quizContainer.addEventListener('click', (e) => {
-            if (e.target.classList.contains('option-btn')) {
-                this.selectAnswer(parseInt(e.target.getAttribute('data-answer')));
+    selectAnswer(optionIndex, answer) {
+        // Store the answer
+        this.userAnswers[this.currentQuestionIndex] = {
+            questionIndex: this.currentQuestionIndex,
+            answer: answer,
+            optionIndex: optionIndex
+        };
+
+        // Show feedback
+        const optionBtns = document.querySelectorAll('.option-btn');
+        optionBtns.forEach((btn, index) => {
+            btn.disabled = true;
+            if (index === optionIndex) {
+                btn.classList.add('selected');
             }
         });
 
-        // Show/hide navigation buttons
-        const nextBtn = document.getElementById('next-question-btn');
-        const submitBtn = document.getElementById('submit-lesson-btn');
-        
-        nextBtn.style.display = 'none';
-        submitBtn.style.display = 'none';
-    }
-
-    // Select answer
-    selectAnswer(answerIndex) {
-        // Remove previous selection
-        document.querySelectorAll('.option-btn').forEach(btn => {
-            btn.classList.remove('selected');
-        });
-
-        // Add selection to clicked button
-        document.querySelector(`[data-answer="${answerIndex}"]`).classList.add('selected');
-        
-        // Store answer
-        this.userAnswers[this.currentQuestionIndex] = answerIndex;
-
-        // Show next button
+        // Show next question button or submit button
         const nextBtn = document.getElementById('next-question-btn');
         const submitBtn = document.getElementById('submit-lesson-btn');
         
         if (this.currentQuestionIndex < this.currentLesson.questions.length - 1) {
-            nextBtn.style.display = 'inline-flex';
+            if (nextBtn) nextBtn.style.display = 'block';
         } else {
-            submitBtn.style.display = 'inline-flex';
+            if (submitBtn) submitBtn.style.display = 'block';
         }
     }
 
-    // Next question
     nextQuestion() {
-        if (this.currentQuestionIndex < this.currentLesson.questions.length - 1) {
-            this.currentQuestionIndex++;
-            this.showQuestion(this.currentQuestionIndex);
-        }
-    }
-
-    // Submit lesson
-    async submitLesson() {
-        if (this.userAnswers.length !== this.currentLesson.questions.length) {
-            authManager.showMessage('Please answer all questions', 'error');
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/learning/lesson/${this.currentLesson._id}/submit`, {
-                method: 'POST',
-                headers: authManager.getAuthHeaders(),
-                body: JSON.stringify({
-                    answers: this.userAnswers
-                })
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                this.showLessonResults(data);
-            } else {
-                authManager.showMessage('Failed to submit lesson', 'error');
-            }
-        } catch (error) {
-            console.error('Error submitting lesson:', error);
-            authManager.showMessage('Network error submitting lesson', 'error');
-        }
-    }
-
-    // Show lesson results
-    showLessonResults(results) {
-        const quizContainer = document.getElementById('quiz-container');
+        this.currentQuestionIndex++;
+        const question = this.currentLesson.questions[this.currentQuestionIndex];
+        this.displayQuestion(question, this.currentQuestionIndex, this.currentLesson.questions.length);
         
-        quizContainer.innerHTML = `
-            <div class="results-card">
-                <h2>🎉 Lesson Completed!</h2>
-                <div class="results-stats">
-                    <div class="stat">
-                        <span class="stat-value">${results.score}</span>
-                        <span class="stat-label">Score</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value">${results.coinsEarned}</span>
-                        <span class="stat-label">Coins Earned</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value">${results.newCoins}</span>
-                        <span class="stat-label">Total Coins</span>
-                    </div>
-                </div>
-                ${results.levelUp ? '<div class="level-up">🎊 Level Up! 🎊</div>' : ''}
-                
-                <div class="question-results">
-                    <h3>Question Review:</h3>
-                    ${results.results.map((result, index) => `
-                        <div class="question-result ${result.isCorrect ? 'correct' : 'incorrect'}">
-                            <h4>Question ${index + 1}: ${result.question}</h4>
-                            <p><strong>Your answer:</strong> ${result.userAnswer + 1}</p>
-                            <p><strong>Correct answer:</strong> ${result.correctAnswer + 1}</p>
-                            <p><strong>Explanation:</strong> ${result.explanation}</p>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-
-        // Update user info
-        authManager.currentUser.coins = results.newCoins;
-        authManager.currentUser.totalScore = results.totalScore;
-        if (results.levelUp) {
-            authManager.currentUser.level = results.newLevel;
-        }
-        authManager.updateUserInfo();
-
-        // Show back button
+        // Hide buttons
         document.getElementById('next-question-btn').style.display = 'none';
         document.getElementById('submit-lesson-btn').style.display = 'none';
-        
-        // Add continue button
-        const continueBtn = document.createElement('button');
-        continueBtn.className = 'btn btn-primary';
-        continueBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Back to World';
-        continueBtn.onclick = () => this.showWorldPage(this.currentWorld);
-        
-        document.querySelector('.lesson-actions').appendChild(continueBtn);
-        
-        authManager.showMessage('Lesson completed successfully!', 'success');
     }
 
-    // Show world (go back to world from lesson)
+    async submitLesson() {
+        try {
+            const response = await authManager.makeRequest(
+                `/api/learning/lesson/${this.currentLesson._id}/submit`,
+                'POST',
+                { answers: this.userAnswers }
+            );
+            
+            if (response.ok) {
+                const result = await response.json();
+                this.showMessage(`Lesson completed! You earned ${result.coinsEarned} 🪙`, 'success');
+                
+                // Update user progress
+                await this.loadUserProgress();
+                
+                // Go back to world
+                this.showWorld();
+            } else {
+                const error = await response.json();
+                this.showMessage(error.message || 'Failed to submit lesson', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to submit lesson:', error);
+            this.showMessage('Network error. Please try again.', 'error');
+        }
+    }
+
     showWorld() {
         if (this.currentWorld) {
-            this.showWorldPage(this.currentWorld);
+            this.enterWorld(this.currentWorld);
         } else {
-            authManager.showMainApp();
+            this.showHome();
         }
+    }
+
+    showHome() {
+        authManager.hideAllPages();
+        document.getElementById('home-page').classList.add('active');
+    }
+
+    showMessage(message, type = 'success') {
+        const container = document.getElementById('message-container');
+        const messageEl = document.createElement('div');
+        messageEl.className = `message ${type}`;
+        messageEl.textContent = message;
+        
+        container.appendChild(messageEl);
+        
+        setTimeout(() => {
+            messageEl.remove();
+        }, 5000);
     }
 }
 
-// Global app manager instance
-const appManager = new AppManager();
-
-// Global functions for navigation
+// Global functions for HTML onclick handlers
 function showHome() {
-    authManager.hideAllPages();
-    document.getElementById('home-page').classList.add('active');
+    appManager.showHome();
 }
 
 function showProfile() {
@@ -383,7 +493,9 @@ function showProfile() {
 function showLeaderboard() {
     authManager.hideAllPages();
     document.getElementById('leaderboard-page').classList.add('active');
-    loadLeaderboard();
+    if (window.leaderboardManager) {
+        window.leaderboardManager.loadLeaderboard();
+    }
 }
 
 function showParentCorner() {
@@ -391,12 +503,8 @@ function showParentCorner() {
     document.getElementById('parent-corner-page').classList.add('active');
 }
 
-function enterWorld(world) {
-    appManager.enterWorld(world);
-}
-
-function showWorld() {
-    appManager.showWorld();
+function enterWorld(worldName) {
+    appManager.enterWorld(worldName);
 }
 
 function nextQuestion() {
@@ -407,7 +515,5 @@ function submitLesson() {
     appManager.submitLesson();
 }
 
-// Initialize app when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    appManager.init();
-});
+// Initialize app manager
+const appManager = new AppManager();

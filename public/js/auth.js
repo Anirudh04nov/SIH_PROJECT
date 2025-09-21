@@ -1,414 +1,373 @@
-// Authentication functionality
+// Authentication Manager
 class AuthManager {
     constructor() {
-        console.log('AuthManager: Initializing...');
         this.currentUser = null;
         this.token = localStorage.getItem('token');
-        this.tempUserData = null;
-        console.log('AuthManager: Token found:', !!this.token);
+        this.init();
     }
 
-    // Initialize authentication
-    async init() {
-        try {
-            if (this.token) {
-                try {
-                    await this.validateToken();
-                    this.showMainApp();
-                } catch (error) {
-                    console.log('Token validation failed, showing login');
+    init() {
+        this.setupEventListeners();
+        this.checkAuthStatus();
+    }
+
+    setupEventListeners() {
+        // Login form
+        const loginForm = document.getElementById('login-form');
+        if (loginForm) {
+            loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+        }
+
+        // Login OTP form
+        const loginOtpForm = document.getElementById('login-otp-form');
+        if (loginOtpForm) {
+            loginOtpForm.addEventListener('submit', (e) => this.handleLoginOtp(e));
+        }
+
+        // Register form
+        const registerForm = document.getElementById('register-form');
+        if (registerForm) {
+            registerForm.addEventListener('submit', (e) => this.handleRegister(e));
+        }
+
+        // Register OTP form
+        const registerOtpForm = document.getElementById('register-otp-form');
+        if (registerOtpForm) {
+            registerOtpForm.addEventListener('submit', (e) => this.handleRegisterOtp(e));
+        }
+    }
+
+    async checkAuthStatus() {
+        if (this.token) {
+            try {
+                const response = await this.makeRequest('/api/user/profile', 'GET');
+                if (response.ok) {
+                    const user = await response.json();
+                    this.currentUser = user;
+                    this.showAuthenticatedUI();
+                } else {
                     this.logout();
                 }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                this.logout();
+            }
+        } else {
+            this.showLoginUI();
+        }
+    }
+
+    async handleLogin(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const email = formData.get('email');
+
+        try {
+            this.showLoading(e.target);
+            const response = await this.makeRequest('/api/auth/send-login-otp', 'POST', { email });
+            const result = await response.json();
+
+            if (response.ok) {
+                this.showMessage('OTP sent to your email!', 'success');
+                this.showLoginOtpForm();
             } else {
-                console.log('No token found, showing login');
-                this.showLogin();
+                this.showMessage(result.message || 'Failed to send OTP', 'error');
             }
         } catch (error) {
-            console.error('Auth initialization error:', error);
-            // Fallback: show login page
-            this.showLogin();
+            console.error('Login error:', error);
+            this.showMessage('Network error. Please try again.', 'error');
+        } finally {
+            this.hideLoading(e.target);
         }
     }
 
-    // Validate token and get user data
-    async validateToken() {
-        const response = await fetch('/api/user/profile', {
-            headers: {
-                'Authorization': `Bearer ${this.token}`
+    async handleLoginOtp(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const otp = formData.get('otp');
+
+        try {
+            this.showLoading(e.target);
+            const response = await this.makeRequest('/api/auth/verify-login-otp', 'POST', { otp });
+            const result = await response.json();
+
+            if (response.ok) {
+                this.token = result.token;
+                this.currentUser = result.user;
+                localStorage.setItem('token', this.token);
+                this.showMessage('Login successful!', 'success');
+                this.showAuthenticatedUI();
+            } else {
+                this.showMessage(result.message || 'Invalid OTP', 'error');
             }
-        });
-
-        if (!response.ok) {
-            throw new Error('Invalid token');
+        } catch (error) {
+            console.error('Login OTP error:', error);
+            this.showMessage('Network error. Please try again.', 'error');
+        } finally {
+            this.hideLoading(e.target);
         }
-
-        const data = await response.json();
-        this.currentUser = data.user;
-        this.updateUserInfo();
     }
 
-    // Show login page
-    showLogin() {
-        this.hideLoadingScreen();
+    async handleRegister(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const userData = {
+            name: formData.get('name'),
+            age: parseInt(formData.get('age')),
+            email: formData.get('email'),
+            areaOfInterest: formData.get('areaOfInterest'),
+            parentEmail: formData.get('parentEmail') || null
+        };
+
+        try {
+            this.showLoading(e.target);
+            const response = await this.makeRequest('/api/auth/send-registration-otp', 'POST', userData);
+            const result = await response.json();
+
+            if (response.ok) {
+                this.showMessage('Verification code sent to your email!', 'success');
+                this.showRegisterOtpForm();
+            } else {
+                this.showMessage(result.message || 'Failed to send verification code', 'error');
+            }
+        } catch (error) {
+            console.error('Registration error:', error);
+            this.showMessage('Network error. Please try again.', 'error');
+        } finally {
+            this.hideLoading(e.target);
+        }
+    }
+
+    async handleRegisterOtp(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const otp = formData.get('otp');
+
+        try {
+            this.showLoading(e.target);
+            const response = await this.makeRequest('/api/auth/verify-registration-otp', 'POST', { otp });
+            const result = await response.json();
+
+            if (response.ok) {
+                this.token = result.token;
+                this.currentUser = result.user;
+                localStorage.setItem('token', this.token);
+                this.showMessage('Registration successful! Welcome to Learning World!', 'success');
+                this.showAuthenticatedUI();
+            } else {
+                this.showMessage(result.message || 'Invalid verification code', 'error');
+            }
+        } catch (error) {
+            console.error('Registration OTP error:', error);
+            this.showMessage('Network error. Please try again.', 'error');
+        } finally {
+            this.hideLoading(e.target);
+        }
+    }
+
+    async makeRequest(url, method = 'GET', data = null) {
+        const options = {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        };
+
+        if (this.token) {
+            options.headers['Authorization'] = `Bearer ${this.token}`;
+        }
+
+        if (data) {
+            options.body = JSON.stringify(data);
+        }
+
+        return fetch(url, options);
+    }
+
+    showLoginUI() {
         this.hideAllPages();
         document.getElementById('login-page').classList.add('active');
         document.getElementById('navbar').style.display = 'none';
-        document.getElementById('main-content').style.display = 'none';
     }
 
-    // Show register page
-    showRegister() {
-        this.hideAllPages();
-        document.getElementById('register-page').classList.add('active');
-    }
-
-    // Show main application
-    showMainApp() {
-        this.hideLoadingScreen();
+    showAuthenticatedUI() {
         this.hideAllPages();
         document.getElementById('home-page').classList.add('active');
         document.getElementById('navbar').style.display = 'block';
-        document.getElementById('main-content').style.display = 'block';
-        this.loadHomeData();
-    }
-
-    // Hide loading screen
-    hideLoadingScreen() {
-        const loadingScreen = document.getElementById('loading-screen');
-        if (loadingScreen) {
-            loadingScreen.style.display = 'none';
+        this.updateUserInfo();
+        if (window.appManager) {
+            window.appManager.loadUserProgress();
         }
     }
 
-    // Hide all pages
+    showLoginOtpForm() {
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('login-otp-form').style.display = 'block';
+    }
+
+    showLoginForm() {
+        document.getElementById('login-otp-form').style.display = 'none';
+        document.getElementById('login-form').style.display = 'block';
+    }
+
+    showRegisterOtpForm() {
+        document.getElementById('register-form').style.display = 'none';
+        document.getElementById('register-otp-form').style.display = 'block';
+    }
+
+    showRegisterForm() {
+        document.getElementById('register-otp-form').style.display = 'none';
+        document.getElementById('register-form').style.display = 'block';
+    }
+
     hideAllPages() {
         const pages = document.querySelectorAll('.page');
         pages.forEach(page => page.classList.remove('active'));
     }
 
-    // Update user info in UI
     updateUserInfo() {
         if (this.currentUser) {
-            document.getElementById('user-name').textContent = this.currentUser.name;
-            document.getElementById('user-coins').textContent = `${this.currentUser.coins} 🪙`;
-            
-            // Update profile page
-            document.getElementById('profile-name').textContent = this.currentUser.name;
-            document.getElementById('profile-email').textContent = this.currentUser.email;
-            document.getElementById('profile-coins').textContent = this.currentUser.coins;
-            document.getElementById('profile-score').textContent = this.currentUser.totalScore;
-            
-            // Update world levels
-            document.getElementById('science-level').textContent = this.currentUser.level.science;
-            document.getElementById('math-level').textContent = this.currentUser.level.math;
-            document.getElementById('history-level').textContent = this.currentUser.level.history;
-            document.getElementById('life-skills-level').textContent = this.currentUser.level.lifeSkills;
-            
-            // Update profile levels
-            document.getElementById('profile-science-level').textContent = this.currentUser.level.science;
-            document.getElementById('profile-math-level').textContent = this.currentUser.level.math;
-            document.getElementById('profile-history-level').textContent = this.currentUser.level.history;
-            document.getElementById('profile-life-skills-level').textContent = this.currentUser.level.lifeSkills;
+            // Update user name
+            const userNameElements = document.querySelectorAll('#user-name, #profile-name');
+            userNameElements.forEach(el => el.textContent = this.currentUser.name);
+
+            // Update user email
+            const userEmailElements = document.querySelectorAll('#profile-email');
+            userEmailElements.forEach(el => el.textContent = this.currentUser.email);
+
+            // Update coins
+            const coinsElements = document.querySelectorAll('#user-coins, #profile-coins');
+            coinsElements.forEach(el => el.textContent = `${this.currentUser.coins || 0} 🪙`);
+
+            // Update level
+            const levelElements = document.querySelectorAll('#user-level');
+            levelElements.forEach(el => el.textContent = `Level ${this.currentUser.level || 1}`);
         }
     }
 
-    // Send registration OTP
-    async sendRegistrationOTP(formData) {
-        try {
-            const response = await fetch('/api/auth/send-registration-otp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            });
-
-            const data = await response.json();
-            
-            if (response.ok) {
-                this.tempUserData = formData;
-                this.showMessage('OTP sent to your email!', 'success');
-                this.showRegistrationOTPForm();
-            } else {
-                this.showMessage(data.message || 'Failed to send OTP', 'error');
-            }
-        } catch (error) {
-            this.showMessage('Network error. Please try again.', 'error');
-        }
-    }
-
-    // Verify registration OTP
-    async verifyRegistrationOTP(otp) {
-        try {
-            const response = await fetch('/api/auth/verify-registration-otp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    ...this.tempUserData,
-                    otp: otp
-                })
-            });
-
-            const data = await response.json();
-            
-            if (response.ok) {
-                this.token = data.token;
-                this.currentUser = data.user;
-                localStorage.setItem('token', this.token);
-                this.showMessage('Registration successful! Welcome to Learning World!', 'success');
-                this.showMainApp();
-            } else {
-                this.showMessage(data.message || 'Invalid OTP', 'error');
-            }
-        } catch (error) {
-            this.showMessage('Network error. Please try again.', 'error');
-        }
-    }
-
-    // Send login OTP
-    async sendLoginOTP(email) {
-        try {
-            const response = await fetch('/api/auth/send-login-otp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ email })
-            });
-
-            const data = await response.json();
-            
-            if (response.ok) {
-                this.tempUserData = { email };
-                this.showMessage('OTP sent to your email!', 'success');
-                this.showLoginOTPForm();
-            } else {
-                this.showMessage(data.message || 'Failed to send OTP', 'error');
-            }
-        } catch (error) {
-            this.showMessage('Network error. Please try again.', 'error');
-        }
-    }
-
-    // Verify login OTP
-    async verifyLoginOTP(otp) {
-        try {
-            const response = await fetch('/api/auth/verify-login-otp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    email: this.tempUserData.email,
-                    otp: otp
-                })
-            });
-
-            const data = await response.json();
-            
-            if (response.ok) {
-                this.token = data.token;
-                this.currentUser = data.user;
-                localStorage.setItem('token', this.token);
-                this.showMessage('Login successful! Welcome back!', 'success');
-                this.showMainApp();
-            } else {
-                this.showMessage(data.message || 'Invalid OTP', 'error');
-            }
-        } catch (error) {
-            this.showMessage('Network error. Please try again.', 'error');
-        }
-    }
-
-    // Show registration OTP form
-    showRegistrationOTPForm() {
-        document.getElementById('register-form').style.display = 'none';
-        document.getElementById('register-otp-form').style.display = 'block';
-    }
-
-    // Show registration form
-    showRegistrationForm() {
-        document.getElementById('register-form').style.display = 'block';
-        document.getElementById('register-otp-form').style.display = 'none';
-    }
-
-    // Show login OTP form
-    showLoginOTPForm() {
-        document.getElementById('login-form').style.display = 'none';
-        document.getElementById('login-otp-form').style.display = 'block';
-    }
-
-    // Show login form
-    showLoginForm() {
-        document.getElementById('login-form').style.display = 'block';
-        document.getElementById('login-otp-form').style.display = 'none';
-    }
-
-    // Logout
     logout() {
-        this.token = null;
         this.currentUser = null;
+        this.token = null;
         localStorage.removeItem('token');
-        this.showLogin();
-        this.showMessage('Logged out successfully', 'info');
+        this.showLoginUI();
+        this.showMessage('Logged out successfully', 'success');
     }
 
-    // Load home data
-    async loadHomeData() {
-        try {
-            // Load user progress
-            const progressResponse = await fetch('/api/user/progress', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
+    showLoading(element) {
+        element.classList.add('loading');
+        const buttons = element.querySelectorAll('button');
+        buttons.forEach(btn => {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+        });
+    }
+
+    hideLoading(element) {
+        element.classList.remove('loading');
+        const buttons = element.querySelectorAll('button');
+        buttons.forEach(btn => {
+            btn.disabled = false;
+            // Reset button text based on button type
+            if (btn.type === 'submit') {
+                if (element.id === 'login-form') {
+                    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Login Code';
+                } else if (element.id === 'login-otp-form') {
+                    btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+                } else if (element.id === 'register-form') {
+                    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Verification Code';
+                } else if (element.id === 'register-otp-form') {
+                    btn.innerHTML = '<i class="fas fa-check"></i> Complete Registration';
                 }
-            });
-
-            if (progressResponse.ok) {
-                const progressData = await progressResponse.json();
-                this.updateProgressDisplay(progressData);
-            }
-
-            // Load today's challenges
-            this.loadTodayChallenges();
-        } catch (error) {
-            console.error('Error loading home data:', error);
-        }
-    }
-
-    // Update progress display
-    updateProgressDisplay(progressData) {
-        // Update world levels based on progress
-        Object.keys(progressData.progress).forEach(world => {
-            const levelElement = document.getElementById(`${world}-level`);
-            if (levelElement) {
-                levelElement.textContent = progressData.progress[world].level;
             }
         });
     }
 
-    // Load today's challenges
-    loadTodayChallenges() {
-        const challengesGrid = document.getElementById('challenges-grid');
-        const challenges = [
-            { title: 'Complete 1 Science Lesson', icon: '🔬', completed: false },
-            { title: 'Earn 10 Coins', icon: '🪙', completed: false },
-            { title: 'Solve 5 Math Problems', icon: '🧮', completed: false },
-            { title: 'Learn about Indian History', icon: '🏛️', completed: false }
-        ];
-
-        challengesGrid.innerHTML = challenges.map(challenge => `
-            <div class="challenge-item ${challenge.completed ? 'completed' : ''}">
-                <div class="challenge-icon">${challenge.icon}</div>
-                <div class="challenge-title">${challenge.title}</div>
-            </div>
-        `).join('');
-    }
-
-    // Show message
-    showMessage(message, type = 'info') {
-        const messageContainer = document.getElementById('message-container');
-        const messageElement = document.createElement('div');
-        messageElement.className = `message ${type}`;
+    showMessage(message, type = 'success') {
+        const container = document.getElementById('message-container');
+        const messageEl = document.createElement('div');
+        messageEl.className = `message ${type}`;
+        messageEl.textContent = message;
         
-        const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
-        messageElement.innerHTML = `
-            <span>${icon}</span>
-            <span>${message}</span>
-        `;
-
-        messageContainer.appendChild(messageElement);
-
-        // Auto remove after 5 seconds
+        container.appendChild(messageEl);
+        
         setTimeout(() => {
-            if (messageElement.parentNode) {
-                messageElement.parentNode.removeChild(messageElement);
-            }
+            messageEl.remove();
         }, 5000);
     }
 
-    // Get auth headers
-    getAuthHeaders() {
-        return {
-            'Authorization': `Bearer ${this.token}`,
-            'Content-Type': 'application/json'
-        };
+    // Demo login function
+    async demoLogin() {
+        try {
+            this.showMessage('Logging in with demo account...', 'success');
+            
+            // Create a demo user object
+            const demoUser = {
+                _id: 'demo-user-123',
+                name: 'Demo Student',
+                email: 'demo@learningworld.com',
+                age: 10,
+                areaOfInterest: 'All',
+                coins: 150,
+                level: 3,
+                totalScore: 1250,
+                scienceLevel: 2,
+                mathLevel: 3,
+                historyLevel: 1,
+                lifeSkillsLevel: 2,
+                achievements: [
+                    { name: 'First Lesson', description: 'Completed your first lesson!', icon: '🎉' },
+                    { name: 'Science Explorer', description: 'Completed 5 science lessons', icon: '🔬' },
+                    { name: 'Math Master', description: 'Completed 10 math lessons', icon: '🧮' }
+                ]
+            };
+
+            // Create a demo token
+            const demoToken = 'demo-token-' + Date.now();
+            
+            // Set user and token
+            this.currentUser = demoUser;
+            this.token = demoToken;
+            localStorage.setItem('token', demoToken);
+            
+            // Show success message
+            this.showMessage('Demo login successful! Welcome to Learning World!', 'success');
+            
+            // Show authenticated UI
+            this.showAuthenticatedUI();
+            
+        } catch (error) {
+            console.error('Demo login error:', error);
+            this.showMessage('Demo login failed. Please try again.', 'error');
+        }
     }
 }
 
-// Global auth manager instance
-const authManager = new AuthManager();
-
-// Form event listeners
-document.addEventListener('DOMContentLoaded', () => {
-    // Registration form
-    document.getElementById('register-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData);
-        await authManager.sendRegistrationOTP(data);
-    });
-
-    // Registration OTP form
-    document.getElementById('register-otp-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const otp = document.getElementById('register-otp').value;
-        await authManager.verifyRegistrationOTP(otp);
-    });
-
-    // Login form
-    document.getElementById('login-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const email = formData.get('email');
-        await authManager.sendLoginOTP(email);
-    });
-
-    // Login OTP form
-    document.getElementById('login-otp-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const otp = document.getElementById('login-otp').value;
-        await authManager.verifyLoginOTP(otp);
-    });
-
-    // Hide loading screen after 3 seconds as fallback
-    setTimeout(() => {
-        const loadingScreen = document.getElementById('loading-screen');
-        if (loadingScreen && loadingScreen.style.display !== 'none') {
-            console.log('Fallback: Hiding loading screen after timeout');
-            loadingScreen.style.display = 'none';
-            // Show login page if nothing else is shown
-            if (!document.querySelector('.page.active')) {
-                authManager.showLogin();
-            }
-        }
-    }, 3000);
-
-    // Initialize auth
-    authManager.init();
-});
-
-// Global functions for navigation
+// Global functions for HTML onclick handlers
 function showLogin() {
-    authManager.showLogin();
+    authManager.hideAllPages();
+    document.getElementById('login-page').classList.add('active');
 }
 
 function showRegister() {
-    authManager.showRegister();
+    authManager.hideAllPages();
+    document.getElementById('register-page').classList.add('active');
+}
+
+function showLoginForm() {
+    authManager.showLoginForm();
+}
+
+function showRegisterForm() {
+    authManager.showRegisterForm();
 }
 
 function logout() {
     authManager.logout();
 }
 
-// Skip loading screen function
-function skipLoading() {
-    console.log('Skipping loading screen...');
-    const loadingScreen = document.getElementById('loading-screen');
-    if (loadingScreen) {
-        loadingScreen.style.display = 'none';
-    }
-    // Show login page
-    authManager.showLogin();
+function demoLogin() {
+    authManager.demoLogin();
 }
+
+// Initialize auth manager
+const authManager = new AuthManager();
